@@ -1,2 +1,2 @@
 # pydispersion
-Library for dipersion ultrashort pulses
+Library for dipersion of ultrashort pulses
