@@ -83,14 +83,14 @@ def test_propagation(x_f):
     """plot a the diiference between the théorical expression and the calculate value for a propagation throught BK7 glass after a distance x_f"""
 
     pulse_in = pulse.Analytics(shape="Gaussian")
-    pulse_in.SetParameters()
+
 
     glass=components.Matter('BK7') # creation of the material
     pulse_out=glass.propagation(x_f, pulse_in)
     pulse_out.SetParameters()
     pulse_out.SetTimeParameters()
 
-    gamma=pulse_in.gamma
+    gamma=4*np.log(2)/pulse_in.HMD**2
     ksi=2*gamma*glass.GDD
     gamma_x=gamma/(1+ksi**2*x_f**2)-1j*gamma*ksi*x_f/(1+ksi**2*x_f**2)
     Y_theo=np.sqrt(np.pi/gamma)*np.sqrt(np.abs(gamma_x/np.pi))*np.exp(-gamma/(1+ksi**2*x_f**2)*pulse_out.X_time**2)
@@ -122,3 +122,5 @@ def test_PrismCompressor(error=0.03):
 
 
 #####################################################################################test random#######################################################
+
+

@@ -33,6 +33,32 @@ class BaseGraph:
         plt.grid(self.show_grid)
         plt.show()
     
+    def comparedouble(self, pulse1, pulse2): 
+        plt.title("Comparaison between two pulses")
+        self.fig1= plt.subplot(211) #left top 
+        self.fig1.plot(pulse1.X,np.abs(pulse1.Y), label="pulse1")
+        self.fig1.plot(pulse2.X,np.abs(pulse2.Y), label="pulse2")
+        self.fig1b=self.fig1.twinx()
+        self.fig1b.plot(pulse2.X,(pulse2.phase-pulse1.phase), 'r--',label="phase difference" )
+        
+        self.fig1.set_title("spectral representation ")
+        self.fig1.set_ylabel("Field amplitude a.u")
+        self.fig1.set_xlabel("angular frequency w")
+        self.fig1.legend(["pulse1","pulse2"],loc='upper right')
+        self.fig1b.legend(["phase difference"])
+        
+        self.fig2=plt.subplot(212) #right top 
+        self.fig2.plot(pulse1.X_time,np.abs(pulse1.Y_time), label="first")
+        self.fig2.plot(pulse2.X_time,np.abs(pulse2.Y_time), label="second")
+        self.fig2.legend(["pulse1","pulse2"])
+                
+            
+        self.fig2.set_title("temporal representation with {} fs of difference".format(np.around(pulse2.parameters['delay']-pulse1.parameters['delay'])))
+        self.fig2.set_xlim(-3*max(pulse1.parameters['HMD'], pulse2.parameters['HMD']), 3*max(pulse1.parameters['HMD'], pulse2.parameters['HMD']) )
+        self.fig2.set_ylabel("Time Field amplitude in a.u")
+        self.fig2.set_xlabel("time in femtosecond")
+        plt.tight_layout(pad=0.1)
+    
     def compare(self, pulse1, pulse2):
         """plotting of the two pulses in all the representation
         split in 4 parts
@@ -40,7 +66,7 @@ class BaseGraph:
         """
         plt.title("pulse propagation after a given distance")
         self.fig1= plt.subplot(221) #left top 
-        self.fig1.plot(pulse1.X,pulse1.Y)
+        self.fig1.plot(pulse1.X,np.abs(pulse1.Y))
         self.fig1b=self.fig1.twinx()
         self.fig1b.plot(pulse1.X,pulse1.phase, 'r--')
         self.fig1.set_title("pulse1 spectral representation ")
@@ -61,7 +87,7 @@ class BaseGraph:
         
         
         self.fig3=plt.subplot(223) #left bottom
-        self.fig3.plot(pulse2.X,pulse2.Y)
+        self.fig3.plot(pulse2.X,np.abs(pulse2.Y))
         self.fig3b=self.fig3.twinx()
         self.fig3b.plot(pulse2.X,pulse2.phase,'r--')
         self.fig3.set_title("spetral representation pulse2")
