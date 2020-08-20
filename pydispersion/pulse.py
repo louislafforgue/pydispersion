@@ -114,6 +114,7 @@ class Pulse:
         take an intensity profile and return a tab with the 3 parameters
         
         """ 
+        Y=np.abs(Y)
         I0=np.amax(Y) #store the maximum value
         
         in_fwhm=False #used to 
@@ -167,30 +168,33 @@ class Pulse:
         self.parameters['HMD']=self.param[2]
         
     def FreqtoTime(self, update=True):
+        """inverse fourier transform
+        update : bool, true to update the array Y_time
+        """
+        
+        #compute the inverse fourier tranform
+#        Y_signal=self.Y*np.exp(1j*self.phase)
         #centered padding
 #        Y_pad=np.hstack([np.zeros(self.N_grid//2-self.N_signal//2),self.Y,np.zeros(self.N_grid//2-self.N_signal//2)])
-        #compute the inverse fourier tranform
-        Y_signal=self.Y*np.exp(-1j*self.phase)
-        Y_time=fftshift(ifft(Y_signal, self.N_grid))*self.normf #size N_grid
-        Y_signal=Y_time[self.N_grid//2-self.N_signal//2:self.N_grid//2+self.N_signal//2]  #size N_signal
-        
+        Y_time=fftshift(ifft(self.Y, self.N_grid))*self.normf #size N_grid
+#        Y_time=Y_time[self.N_grid//2-self.N_signal//2:self.N_grid//2+self.N_signal//2]  #size N_signal
+        Y_time=Y_time[self.N_grid//2:self.N_grid//2+self.N_signal]
         if update==True: 
-            self.Y_time=np.abs(Y_signal)
-            self.phase_time=np.angle(Y_signal)
-        return Y_signal  #size N_signal
+            self.Y_time=Y_time #take the complex signal
+#            self.temporal_phase=np.angle(Y_time)
+        return Y_time  #size N_signal
 
     def TimetoFreq(self, update=True): 
-        Y_signal=self.Y_time*np.exp(1j*self.phase_time)
         #centered padding
-        Y_time_pad=np.hstack([np.zeros(self.N_grid//2-self.N_signal//2),Y_signal,np.zeros(self.N_grid//2-self.N_signal//2)])
+#        Y_time_pad=np.hstack([np.zeros(self.N_grid//2-self.N_signal//2),self.Y_time,np.zeros(self.N_grid//2-self.N_signal//2)])
         #fourier transform calculation
-        Yf_omega=fftshift(fft(Y_time_pad))/self.normf
-        Yf_omega=Yf_omega[self.N_grid//2:self.N_grid//2+self.N_signal]
+        Yf_omega=fftshift(fft(self.Y_time, self.N_grid))/self.normf
+        Yf_omega=Yf_omega[self.N_grid//2:self.N_grid//2+self.N_signal] #resizing the array
         if update==True: 
-            self.Y=np.abs(Yf_omega)
-            self.phase_time=np.angle(Yf_omega)
+            self.Y=Yf_omega
+#            self.phase=np.angle(Yf_omega)
         
-        return Yf_omega #size N_signal
+        return np.abs(Yf_omega) #size N_signal
 
 
     def Save(self, file_name):
@@ -205,23 +209,6 @@ class Pulse:
         return Pulse( np.copy(self.X), np.copy(self.Y), np.copy(self.phase), N_grid=2**15,  **self.parameters)
         
 #-----------------------------------------------------------------------------------------
-class GaussianSpectrum(Pulse): 
-    """creation of gaussian spectrum, add the comments or add in the class analytics"""
-    
-    def __init__(self, w0=2, E0_f=1, FWHM=0.5, pulse_phase=[], N_grid=2**15, N_omega=2**11, **kwargs):
-        """add the comments"""
-        
-        self.N_grid=N_grid
-        self.N_omega=N_omega
-        self.w0=w0
-        self.max_frequency=self.w0+3*FWHM
-        self.FWHM=FWHM
-        self.E0_f=E0_f
-        self.X=np.linspace(0,self.max_frequency, self.N_omega)
-        self.Y=self.E0_f*np.exp(-np.log(2)*4*((self.X-self.w0)/self.FWHM)**2)
-        super().__init__(self.X,self.Y,pulse_phase,self.X_time, self.Y_time, shape="gaussian", w0=self.w0, E0_f=self.E0_f, FWHM=self.FWHM, **kwargs) 
-
-
 class Analytics(Pulse): 
     """creation of an analytical object
     The optional arguments are N (number of step or the time domaine)
@@ -229,13 +216,13 @@ class Analytics(Pulse):
     """
     
     
-    def __init__(self, shape="Gaussian", f_width=6, w0=2, E0_t=1, HMD=10, poly_phase=[0] ,repre="time",N_grid=2**15, N_signal=2**11, **kwargs):
+    def __init__(self, shape="Gaussian", w0=2, E0=1, FWHM=10, poly_phase=[0] ,repre="time",N_grid=2**15, N_signal=2**11, **kwargs):
         """w0: angular frequency in 10^15 rad/S
         E0_t : float intensity in a.u
         HMD: float Half maximum duration in fs
-        pulse_phase= list(float) , list with the polynomial coffecients, ex: [1,2.3,5] = 1+2.3T+5²T
+        poly_phase= list(float) , list with the polynomial coffecients, ex: [1,2.3,5] = 1+2.3T+5²T
         N_grid: int, more efficient if N=2^k discretization points for the temporal signal
-        N_omega: int, number of points for the spectrum signal 
+        N_signal: int, number of points for the spectrum signal 
         repre: "time" or "freq", default "time"
         """
         
@@ -243,65 +230,106 @@ class Analytics(Pulse):
         self.N_signal=N_signal
         
         self.w0=w0
-        if repre=="freq": 
-            self.I0_f=E0_t
-            self.FWHM=HMD
-        else:
-            self.I0_t=E0_t
-            self.HMD=HMD
-        
-#        self.X_time=np.linspace(-3*self.tau,3*self.tau,self.N_signal)
-#        self.dt=self.X_time[1]-self.X_time[0]
-#        self.X=2*np.pi*fftshift(fftfreq(self.N_grid,self.dt))[self.N_grid//2:self.N_grid//2+N_signal]
-        
+        self.E0=E0
+        if repre=="freq":
+            self.FWHM=FWHM
+        else: 
+            self.HMD=FWHM
+
+#creation of the sequant pulse
         if shape=="Hsech":
             self.K=np.pi*4*0.142 #time band product
+            if repre == "time": 
+                self.FWHM=self.K/self.HMD
             self.X_creation()
-            self.Y_time=self.Hsech()
-            
+            self.Y_creation(repre, self.Hsech, poly_phase)
+
+#creation of a Lorentzian shaped pulse        
         elif shape=="Lorentzian": 
             self.K=np.pi*4*0.315
+            if repre== "time": 
+                self.FWHM=self.K/self.HMD
             self.X_creation()
-            self.Y_time=self.Lorentzian()
-            
+            self.Y_creation(repre, self.Lorentzian, poly_phase)
+#creation of a Gaussian shaped pulse            
         else: 
             self.K=np.pi*4*0.441
+            if repre=="time": 
+                self.FWHM=self.K/self.HMD
             self.X_creation()
-            self.Y_time=self.Gaussian()
-            
+            self.Y_creation(repre, self.Gaussian, poly_phase)
+        
         #we add the parameters from the analytical expression
-        self.temporal_phase=np.zeros(N_signal)
-        for i in range(len(poly_phase)):
-            self.temporal_phase+=poly_phase[i]*(self.X_time**i)
+        super().__init__(self.X,self.Y, self.phase, self.X_time, shape=shape, delay=0, **kwargs)
+        self._post_init(repre)
         
-        self.Y_time=self.Y_time*np.exp(1j*self.temporal_phase)
+    def _post_init(self, repre):
+        if repre=="freq": 
+            self.FreqtoTime()
+        else: 
+            self.TimetoFreq()
+        self.SetParameters()
+        self.SetTimeParameters()
         
-        super().__init__(self.X,self.Y, shape=shape, w0=self.w0, E0_t=self.I0_t, HMD=self.HMD, delay=0, **kwargs)
-
-        
-    def Gaussian(self):
-        """create a Gaussian spectrum and pulse shape in the time domain"""
-        self.gamma=4*np.log(2)/(self.HMD**2)
-        self.Y=self.I0_t*np.sqrt(np.pi/self.gamma)*np.exp(-(self.X-self.w0)**2/(4*self.gamma)) #theoretical fourier transform
-        return self.I0_t*np.exp(-np.log(2)*4*(self.X_time/self.HMD)**2)*np.exp(1j*self.X_time*self.w0) 
+    def Gaussian(self,X, E0, X0, FWHM):
+        """return a gaussian function for a given X with parameters E0, t0, gamma"""
+        gamma=4*np.log(2)/(FWHM**2)
+        return E0*np.exp(-gamma*(X-X0)**2)
     
-    def Hsech(self):
-        """create a HSECH spectrum and pulse shape in the time domain"""
-        self.t0=self.HMD/2.634
-        self.Y=self.I0_t*self.t0*np.pi/np.cosh(np.pi/2*self.t0*(self.X-self.w0))
-        return self.I0_t*(1/np.cosh(self.X_time/self.t0))*np.exp(1j*self.X_time*self.w0)
+    def Lorentzian(self, X, E0, X0, FWHM, repre):
+        return E0/(1+(1.287*(X-X0)/FWHM)**2)
     
-    def Lorentzian(self):
-        """create a Lorentzian spectrum and pulse shape in the time domain"""
-        self.Y=self.I0_t*self.HMD*np.exp(-self.HMD*np.abs(self.X-self.w0))
-        return self.I0_t/(1+(self.X_time/self.HMD)**2)*np.exp(1j*self.X_time*self.w0)
+    def Hsech(self, X, E0, X0, FWHM, repre): 
+        return E0/np.cosh(1.7627/FWHM*(X-X0))
+        
     
     def X_creation(self): 
-        self.X=np.linspace(0,self.w0+3*self.K/self.HMD, self.N_signal)
-        self.df=(self.w0+3*self.K/self.HMD)/(2*np.pi*(self.N_signal-1))
+        """Creation of the frequency, time and fourier grid
+        initialized X, X_time
+        """
+        
+        self.X=np.linspace(0,self.w0+3*self.FWHM, self.N_signal)
+        self.df=(self.w0+3*self.FWHM)/(2*np.pi*(self.N_signal-1))
         self.X_time=fftshift(fftfreq(self.N_grid, self.df))[self.N_grid//2-self.N_signal//2:self.N_grid//2+self.N_signal//2]
         
+        self.time_band=np.abs(self.X_time[0]-self.X_time[-1])
         
+    def Y_creation(self, repre, shape_cal, poly_phase):
+        """create the spectrum in the freuency and time domaine
+        repre : string , "freq" or "time"
+        shape_cal: callable, function for the pulse shape ( ex = Gaussian)
+        poly_phase: list(float) , list with the polynomial coffecients, ex: [1,2.3,5] = 1+2.3T+5²T
+        """
+        
+        if repre=="freq":
+            
+            self.Y=shape_cal(self.X, self.E0, self.w0, self.FWHM)
+            
+            self.phase=np.zeros(self.N_signal)
+            for i in range(len(poly_phase)):
+                self.phase+=poly_phase[i]*((self.X-self.w0)**i)
+            
+            #computing the complex signal
+            self.phase_init=self.time_band%np.pi+np.pi+(self.X-self.w0)*self.time_band/2 #phase initialisation for the fourier transform, need to be accorded with the time axis
+            self.Y=self.Y*np.exp(1j*(self.phase-self.phase_init))
+                
+        else: 
+            self.Y_time=shape_cal(self.X_time, self.E0, 0, self.HMD)
+            
+            self.temporal_phase=np.zeros(self.N_signal)
+            for i in range(len(poly_phase)):
+                self.temporal_phase+=poly_phase[i]*(self.X_time**i)
+            self.temporal_phase=self.temporal_phase+self.w0*self.X_time
+    
+    
+            self.Y_time=self.Y_time*np.exp(1j*self.temporal_phase)
+            #initialize a 0 array before the fourier transform realized in post_ init
+            
+            self.phase=np.zeros(self.N_signal)
+            self.Y=self.phase
+    
+        
+
 #---------------------------------------------------------------------------------------------------------------   
 class Data_input(Pulse):
     """class to create an object pulse from a data_input"""

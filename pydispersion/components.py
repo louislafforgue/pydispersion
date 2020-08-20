@@ -60,10 +60,15 @@ class Matter:
         self.derivatives(pulse_in.l0) #calculation of k_0 k'_0 and k''_0
         self.pulse_out=pulse.Pulse(np.copy(pulse_in.X),np.copy(pulse_in.Y), np.copy(pulse_in.phase)) #creation of a new object pulsation
         
+        self.pulse_out=pulse_in.Copy()
+        
         self.pulse_out.w0=pulse_in.w0
-        self.pulse_out.phase+=(self.k0+self.k_0*(self.pulse_out.w0)+self.GDD/2*(self.pulse_out.X-self.pulse_out.w0)**2)*z # computing the propagation by adding k(w)*z to the phase
+        self.phase_prop=(self.k0+self.k_0*(self.pulse_out.w0)+self.GDD/2*(self.pulse_out.X-self.pulse_out.w0)**2)*z # computing the propagation by adding k(w)*z to the phase
         if third_order: 
-            self.pulse_out.phase+=self.TOD/6*(self.X_omega_self.w0)**3
+            self.phase_prop+=self.TOD/6*(self.X_omega_self.w0)**3
+        self.pulse_out.phase+=self.phase_prop
+        
+        self.pulse_out.Y=self.pulse_out.Y*np.exp(1j*self.phase_prop)
         
         self.pulse_out.parameters['delay']=self.k_0*z
         self.pulse_out.FreqtoTime(update=True)
@@ -122,7 +127,7 @@ class GratingCompressor:
         gamma= angle of incidence
         z : space between the two gratings """
         self.l0=pulse_in.l0
-        pulse_out=pulse_in.copy() #create a new pulse
+        pulse_out=pulse_in.Copy() #create a new pulse
         pulse_out.phase+=(pulse_in.w0-pulse_in.X)**2*self.GDD*z+ z*self.ng*self.w0 #add to the phase
         return pulse_out
 #--------------------------------------------------------------------------------------------------------------------
@@ -190,8 +195,11 @@ class DoublePrismCompressor:
         gamma1 : float, incident angle in radian
         """
         self.GDDcalculate(pulse_in.parameters['l0'], l1, w, h, gamma1)
-        self.pulse_out=pulse_in.copy()
+        self.pulse_out=pulse_in.Copy()
+        
+#add to the phase just for the polynomial version
         self.pulse_out.phase+=self.GDD/2*(pulse_in.X-pulse_in.parameters["w0"])**2
+        self.pulse_out.Y*=np.exp(1j*self.GDD/2*(pulse_in.X-pulse_in.parameters["w0"])**2)
         return self.pulse_out
 
 ##################################################code_test class#####################################################
