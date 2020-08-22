@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Created on Wed Jun 17 10:24:28 2020
-
 @author: lafforgue
-
 version 1.1
-
 """
 
 """
-
 definition of the different class to compute a pulse object 
-
-
 pulse --- data_input
        |
        -- GaussianSpectrum
@@ -22,7 +18,6 @@ pulse --- data_input
 pulse object store a pulsation as a 3*N array [X, Y, Phase], frequencial
 possibility to add a phase as an array
 possibility to add parameters in argument : ex shape= "gaussian"
-
 methods in pulse: 
     # fitting -> report the approximate gaussian fonction with the parameters
     GetParameters -> staticmethod  gives [w0,FWMH, I0] for frequencial or [t0,HMD, I0] for a temporal
@@ -33,7 +28,6 @@ methods in pulse:
     ZeroAdding 
     save
     copy
-
     
 methods in Data_input: 
     reading -> take a filename and read the the first column X and the second column Y
@@ -42,7 +36,6 @@ methods in Data_input:
     interpolation -> reproduce the spectrum with linear X spacing
     processing -> smooting and remoove the negative values
     
-
 Analytics:  
     Pulses which can be created are in time domain:
         -Gaussian "Gaussian": I0exp(-(t/tau)²/2) 
@@ -89,6 +82,8 @@ class Pulse:
         if len(X_time)==0:
             self.X_time=fftshift(fftfreq(self.N_grid,self.df)) #time from the fourier grid
             self.X_time=self.X_time[N_grid//2-self.N_signal//2:self.N_grid//2+self.N_signal//2] #size N_signal
+        
+        self.time_band=np.abs(self.X_time[-1]-self.X_time[0])
         
         if len(pulse_phase)!= self.N_signal:
             self.phase=np.zeros(self.N_signal,dtype='complex128') #creation an empty array for the phase
@@ -364,10 +359,16 @@ class Data_input(Pulse):
             self.processing()
         self.Y=np.sqrt(np.abs(self.Y)) #we take the amplitude of the field
         self.phase=phase
+        
         self.ZeroAdding()
         super().__init__(self.X,self.Y,phase, **kwargs)
-
-
+        self._post_init()
+        
+    def _post_init(self):
+        self.SetParameters()
+        self.w0=self.parameters["w0"]
+        self.phase_init=self.time_band%np.pi+np.pi+(self.X-self.w0)*self.time_band/2 #phase initialisation for the fourier transform, need to be accorded with the time axis
+        self.Y=self.Y*np.exp(-1j*self.phase_init)
         
     def reading(self):
         """reading the file (.dat, .csv')associate to file_name and store the data in Pulse object
